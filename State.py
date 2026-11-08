@@ -28,7 +28,7 @@ class StateManager():
         self._freshScan = True
 
         #define manager's peripherals
-        self.reader = UHFReader('/dev/cu.usbserial-21110')
+        self.reader = UHFReader('/dev/RFID_scanner')
         self.led = LED_strip()
         self.led.off()
         #self.screen = LCD_screen()
