@@ -11,7 +11,7 @@ from peripherals    import *
 from config_reader import read_items, read_alarms
 from config_writer import write_items, write_alarms
 from peripherals.uhf_reader import UHFReader
-from peripherals.LED
+from peripherals.LED import LED_strip
 
 class State(Enum):
     CONFIGURATION       = 1
