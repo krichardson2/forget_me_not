@@ -11,6 +11,7 @@ from peripherals    import *
 from config_reader import read_items, read_alarms
 from config_writer import write_items, write_alarms
 from peripherals.uhf_reader import UHFReader
+from peripherals.LED
 
 class State(Enum):
     CONFIGURATION       = 1
@@ -28,6 +29,11 @@ class StateManager():
 
         #define manager's peripherals
         self.reader = UHFReader('/dev/cu.usbserial-21110')
+        self.led = LED_strip()
+        self.led.off()
+        #self.screen = LCD_screen()
+        #self.clock = Clock()
+        #self.button = PushButton()
 
         # Read in items list
         self.items_list = read_items(path="items.json")
@@ -55,8 +61,10 @@ class StateManager():
 
     def transition(self, state):
         # if state valid, set it
-        # self._state = state
-        pass
+        if state in State:
+            self._state = state
+        else:
+            print(f"Invalid state transition attempted: {state}")
 
     def scan(self):
         # at the start of a new scan, start with a fresh set of tags seen
@@ -68,7 +76,6 @@ class StateManager():
 
         print(f"Expected:\t{tags_expected}")
         print(f"Seen:\t{tags_current_read}")
-
 
         self._tags_seen |= tags_current_read
 
@@ -85,8 +92,6 @@ class StateManager():
             self._freshScan = True
             self.transition(State.ITEMS_ACCOUNTED_FOR)
 
-
-
     def check_triggers(self):
         # from trigger, start 20 minute timer for mode
         # from pushbutton, start 5 minute timer for trigger
@@ -98,33 +103,26 @@ class StateManager():
         self.clock.check()
 
     def close(self):
-        self.reader.close() # close serial conneciton to 
+        self.reader.close() # close serial connection to 
         # self.LCD_screen.close() # Close I2C bus 
 
-def main():
-    manager = StateManager()
-#   manager.initalize_lists(items="/opt/item_list.json", alarms="/opt/alarm_list.json"
-
-    try:
+    def run(self):
         while True:
             time.sleep(1)
-
-            print(f"State: {manager.state}")
-            if (manager.state == State.IDLE):
+            self.check_peripherals()
+            if (self.state == State.IDLE):
                 """
                 check for triggers
                 """
-
-
                 continue
-            elif (manager.state == State.TRIGGERED):
+            elif (self.state == State.TRIGGERED):
                 """
                 Start timer for 20 minutes (Alarm) / 5 Minutes (Button)
                 """
-                manager.scan()
+                self.scan()
                 
                 continue
-            elif (manager.state == State.ITEMS_MISSING):
+            elif (self.state == State.ITEMS_MISSING):
                 """
                 New Loop
                 1. continue Scanning for items, 
@@ -136,32 +134,32 @@ def main():
                 4. If all items found, move back to IDLE
                 5. If button pressed, move back to IDLE
                 """
-                # led.red()
-                manager.scan()
+                led.breathe_fast(RED)
+                self.scan()
                 
                 continue
-            elif (manager.state == State.ITEMS_ACCOUNTED_FOR):
+            elif (self.state == State.ITEMS_ACCOUNTED_FOR):
                 """
                 1. Start 5 minute timer
                 2. Glow GREEN
                 3. Display: "All Items Accounted for"
                 4. After timer/button press, move back to IDLE
                 """
+                led.breathe_slow(GREEN)
                 # led.green()
                 
 
                 continue
-            elif (manager.state == State.CONFIGURATION):
+            elif (self.state == State.CONFIGURATION):
                 
                 continue
 
-
-
-    
+def main():
+    manager = StateManager()
+    try:
+        manager.run()
     except KeyboardInterrupt:
         manager.close()
-
-
 
 if __name__ == "__main__":
     main()
