@@ -59,15 +59,16 @@ class StateManager():
         pass
 
     def scan(self):
-        
+        # at the start of a new scan, start with a fresh set of tags seen
         if self._freshScan:
             self._tags_seen = set()
             self._freshScan = False
-        print(f"Seen: {self._tags_seen}")
-        print(f"Expected: {tags_expected}")
-
-        tags_current_read = self.reader.inventory()
         tags_expected = set(self.profile)
+        tags_current_read = self.reader.inventory(rounds=20, duration=0.15)
+
+        print(f"Expected:\t{tags_expected}")
+        print(f"Seen:\t{tags_current_read}")
+
 
         self._tags_seen |= tags_current_read
 
@@ -75,14 +76,13 @@ class StateManager():
 
         if len(tags_missing) > 0:
             print(f"Items Missing: {tags_missing}")
-            missing_names = sorted(profile[tag] for tag in missing)
-
+            missing_names = sorted(self.profile[tag] for tag in tags_missing)
+            print(f"Missing Names: {missing_names}")
             self.transition(State.ITEMS_MISSING)
         elif len(tags_missing) == 0:
             print("All items accounted for.\n")
             # Reload state variable for new check
             self._freshScan = True
-
             self.transition(State.ITEMS_ACCOUNTED_FOR)
 
 
@@ -103,7 +103,7 @@ class StateManager():
 
 def main():
     manager = StateManager()
-    # manager.initalize_lists(items="/opt/item_list.json", alarms="/opt/alarm_list.json"
+#   manager.initalize_lists(items="/opt/item_list.json", alarms="/opt/alarm_list.json"
 
     try:
         while True:
@@ -136,6 +136,8 @@ def main():
                 4. If all items found, move back to IDLE
                 5. If button pressed, move back to IDLE
                 """
+                # led.red()
+                manager.scan()
                 
                 continue
             elif (manager.state == State.ITEMS_ACCOUNTED_FOR):
@@ -145,6 +147,8 @@ def main():
                 3. Display: "All Items Accounted for"
                 4. After timer/button press, move back to IDLE
                 """
+                # led.green()
+                
 
                 continue
             elif (manager.state == State.CONFIGURATION):
