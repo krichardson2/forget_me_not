@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package rfidcheck;
+
+// One tracked item: an RFID tag mapped to a display name.
+message Item {
+  string tag = 1;   // EPC as uppercase hex, e.g. "E28011B0A506007F786F06B1"
+  string name = 2;  // 1-20 printable ASCII characters (fits one LCD row)
+}
+
+message ItemList {
+  repeated Item items = 1;  // up to 50
+}
+
+// One time-of-day alarm, 24-hour format.
+message Alarm {
+  uint32 hour = 1;    // 0-23
+  uint32 minute = 2;  // 0-59
+  uint32 second = 3;  // 0-59
+}
+
+message AlarmList {
+  repeated Alarm alarms = 1;  // up to 10
+}
