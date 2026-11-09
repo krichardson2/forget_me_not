@@ -36,9 +36,13 @@ class StateManager():
         self._tags_seen = None
         self._freshScan = True
         self._triggers = (False, False) # Alarm, Button
+        self._trigger_deadline = None 
 
         #define manager's peripherals
         self.reader = UHFReader('/dev/RFID_scanner')
+        self.reader.set_region(0x02) # US region
+        self.reader.set_tx_power(18)
+        self.reader.set_session(0, q=4)
         self.led = LED_strip()
         self.led.off()
         self.timer = Timer()
@@ -84,7 +88,7 @@ class StateManager():
         """
         Scan for items and check against expected list.
         """
-        self._presence.update(self.reader.inventory(rounds=50, duration=0.5))
+        self._presence.update(self.reader.inventory(rounds=20, duration=0.5))
         return self._presence.missing()
 
         """
@@ -147,7 +151,7 @@ class StateManager():
 
     def run(self):
         while True:
-            time.sleep(1)
+            time.sleep(0.2)
 
             if (self.state == State.IDLE):
                 """
@@ -164,20 +168,23 @@ class StateManager():
                 """
                 self._presence.reset()
                 # if triggered by alarm, start 20 minute timer
-                if self._triggers[0]:
-                    self.timer.start(20*60)
-                # else if triggered by button, start 5 minute timer
-                elif self._triggers[1]:
-                    self.timer.start(5*60)
-                
+                if self._trigger_deadline is None:
+                    if self._triggers[0]:
+                        self.timer.start(20*60)
+                    # else if triggered by button, start 5 minute timer
+                    elif self._triggers[1]:
+                        self.timer.start(5*60)
+                    self._trigger_deadline = time.monotonic() + 3.0
 
                 self.missing_items = self.scan()
                 print(f"Missing: {self.missing_items}")
                 
-                if len(self.missing_items) > 0:
-                    self.transition(State.ITEMS_MISSING)
-                else:
+                if len(self.missing_items) == 0:
+                    self._trigger_deadline = None
                     self.transition(State.ITEMS_ACCOUNTED_FOR)
+                elif time.monotonic() >= self._trigger_deadline:
+                    self._trigger_deadline = None
+                    self.transition(State.ITEMS_MISSING)
                 continue
             elif (self.state == State.ITEMS_MISSING):
                 """
@@ -196,7 +203,7 @@ class StateManager():
 
                 if (len(self.missing_items) == 0):
                     self.transition(State.ITEMS_ACCOUNTED_FOR)
-
+                    print("No items missing, moving to ITEMS_ACCOUNTED_FOR state.")
                 # exit this state if time's up or button pressed
                 if self.timer.expired: # or self.button.pressed:
                     self.transition(State.IDLE)
@@ -218,6 +225,7 @@ class StateManager():
                 if self.timer.expired: # or self.button.pressed:
                     self.transition(State.IDLE)
                 continue
+
             elif (self.state == State.CONFIGURATION):
                 """
                 This is lower priority, so it will be implemented later.
