@@ -7,11 +7,16 @@ from collections    import deque
 from pathlib        import Path
 
 
-from peripherals    import *
-from config_reader import read_items, read_alarms
-from config_writer import write_items, write_alarms
+from peripherals            import *
+from config_reader          import read_items, read_alarms
+from config_writer          import write_items, write_alarms
 from peripherals.uhf_reader import UHFReader
-from peripherals.LED import LED_strip
+from peripherals.LED        import LED_strip, RED, GREEN, BLUE, WHITE, OFF
+from peripherals.TIMER      import Timer
+from peripherals.PRESENCE   import PresenceTracker
+# from peripherals.lcd_screen  import LCD_screen
+# from peripherals.clock       import Clock
+# from peripherals.push_button import PushButton
 
 class State(Enum):
     CONFIGURATION       = 1
@@ -20,17 +25,23 @@ class State(Enum):
     ITEMS_MISSING       = 4
     ITEMS_ACCOUNTED_FOR = 5
 
+class Trigger(Enum):
+    ALARM  = 1
+    BUTTON = 2
+
 class StateManager():
     def __init__(self):
         #initial state for testing
         self._state = State.TRIGGERED 
         self._tags_seen = None
         self._freshScan = True
+        self._triggers = (False, False) # Alarm, Button
 
         #define manager's peripherals
         self.reader = UHFReader('/dev/RFID_scanner')
         self.led = LED_strip()
         self.led.off()
+        self.timer = Timer()
         #self.screen = LCD_screen()
         #self.clock = Clock()
         #self.button = PushButton()
@@ -46,6 +57,8 @@ class StateManager():
             for ind,item in enumerate(self.items_list.items):
                 print(f"\t{ind} : {item.name}\t|\t{item.tag}")
         
+        self._presence = PresenceTracker(self.profile, window=5.0)
+
         # Read in alarms
         alarms = read_alarms(path="alarms.json")
         if alarms is None:
@@ -66,13 +79,21 @@ class StateManager():
         else:
             print(f"Invalid state transition attempted: {state}")
 
+    
     def scan(self):
+        """
+        Scan for items and check against expected list.
+        """
+        self._presence.update(self.reader.inventory(rounds=50, duration=0.5))
+        return self._presence.missing()
+
+        """
         # at the start of a new scan, start with a fresh set of tags seen
         if self._freshScan:
             self._tags_seen = set()
             self._freshScan = False
         tags_expected = set(self.profile)
-        tags_current_read = self.reader.inventory(rounds=20, duration=0.15)
+        tags_current_read = self.reader.inventory(rounds=50, duration=0.5)
 
         print(f"Expected:\t{tags_expected}")
         print(f"Seen:\t{tags_current_read}")
@@ -80,6 +101,10 @@ class StateManager():
         self._tags_seen |= tags_current_read
 
         tags_missing = tags_expected - self._tags_seen
+
+        # Let's do some better logic here. Should not just be binary each scan,
+        # but rather, keep track of last seen time.
+
 
         if len(tags_missing) > 0:
             print(f"Items Missing: {tags_missing}")
@@ -91,11 +116,22 @@ class StateManager():
             # Reload state variable for new check
             self._freshScan = True
             self.transition(State.ITEMS_ACCOUNTED_FOR)
+        return
+        """
 
     def check_triggers(self):
         # from trigger, start 20 minute timer for mode
         # from pushbutton, start 5 minute timer for trigger
-        return [false, false]
+        if len(self.alarms_list) > 0:
+            now = time.localtime()
+            for alarm in self.alarms_list:
+                if (alarm.hour == now.tm_hour and
+                    alarm.minute == now.tm_min and
+                    alarm.second == now.tm_sec):
+                    return True, False
+        if self.button.short_pressed:
+            return False, True
+        return False, False
 
     def check_peripherals(self):
         self.reader.check()
@@ -104,23 +140,44 @@ class StateManager():
 
     def close(self):
         self.reader.close() # close serial connection to 
+        self.timer.cancel() # cancel any running timers
+        self.led.off()      # turn off LED strip
+
         # self.LCD_screen.close() # Close I2C bus 
 
     def run(self):
         while True:
             time.sleep(1)
-            self.check_peripherals()
+
             if (self.state == State.IDLE):
                 """
                 check for triggers
                 """
+
+                self._triggers = self.check_triggers()
+
+
                 continue
             elif (self.state == State.TRIGGERED):
                 """
                 Start timer for 20 minutes (Alarm) / 5 Minutes (Button)
                 """
-                self.scan()
+                self._presence.reset()
+                # if triggered by alarm, start 20 minute timer
+                if self._triggers[0]:
+                    self.timer.start(20*60)
+                # else if triggered by button, start 5 minute timer
+                elif self._triggers[1]:
+                    self.timer.start(5*60)
                 
+
+                self.missing_items = self.scan()
+                print(f"Missing: {self.missing_items}")
+                
+                if len(self.missing_items) > 0:
+                    self.transition(State.ITEMS_MISSING)
+                else:
+                    self.transition(State.ITEMS_ACCOUNTED_FOR)
                 continue
             elif (self.state == State.ITEMS_MISSING):
                 """
@@ -134,9 +191,15 @@ class StateManager():
                 4. If all items found, move back to IDLE
                 5. If button pressed, move back to IDLE
                 """
-                led.breathe_fast(RED)
-                self.scan()
-                
+                self.led.breathe_fast(RED)
+                self.missing_items = self.scan()
+
+                if (len(self.missing_items) == 0):
+                    self.transition(State.ITEMS_ACCOUNTED_FOR)
+
+                # exit this state if time's up or button pressed
+                if self.timer.expired: # or self.button.pressed:
+                    self.transition(State.IDLE)
                 continue
             elif (self.state == State.ITEMS_ACCOUNTED_FOR):
                 """
@@ -145,13 +208,20 @@ class StateManager():
                 3. Display: "All Items Accounted for"
                 4. After timer/button press, move back to IDLE
                 """
-                led.breathe_slow(GREEN)
-                # led.green()
-                
-
+                self.led.breathe_slow(GREEN)
+                self.missing_items = self.scan()
+                if (len(self.missing_items) == 0):
+                    self.transition(State.ITEMS_ACCOUNTED_FOR)
+                else:
+                    self.transition(State.ITEMS_MISSING)
+                # exit this state if time's up or button pressed
+                if self.timer.expired: # or self.button.pressed:
+                    self.transition(State.IDLE)
                 continue
             elif (self.state == State.CONFIGURATION):
-                
+                """
+                This is lower priority, so it will be implemented later.
+                """
                 continue
 
 def main():
