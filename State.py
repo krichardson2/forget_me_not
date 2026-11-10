@@ -15,7 +15,7 @@ from peripherals.LED        import LED_strip, RED, GREEN, BLUE, WHITE, OFF
 from peripherals.TIMER      import Timer
 from peripherals.PRESENCE   import PresenceTracker
 from peripherals.BUTTON     import Push_Button
-# from peripherals.lcd_screen  import LCD_screen
+from peripherals.LCD  import LCD_screen
 # from peripherals.clock       import Clock
 
 class State(Enum):
@@ -46,7 +46,7 @@ class StateManager():
         self.led = LED_strip()
         self.led.off()
         self.timer = Timer()
-        #self.screen = LCD_screen()
+        self.lcd = LCD_screen()
         #self.clock = Clock()
         self.button = Push_Button()
 
@@ -114,6 +114,7 @@ class StateManager():
         self.reader.close() # close serial connection to 
         self.timer.cancel() # cancel any running timers
         self.led.off()      # turn off LED strip
+        self.lcd.close()
 
         # self.LCD_screen.close() # Close I2C bus 
 
@@ -130,6 +131,10 @@ class StateManager():
                 """
                 self.led.off()
                 self._triggers = self.check_triggers()
+                self.lcd.show_idle(len(self.profile))
+        
+                ## TODO: Still need to rotate after alarms fire
+                
                 if any(self._triggers):
                     self.transition(State.TRIGGERED)
                 continue
@@ -176,6 +181,9 @@ class StateManager():
                 self.led.breathe_fast(RED)
                 self.missing_items = self.scan()
 
+                missing_names = (self.profile[tag] for tag in self.missing_items)
+                self.lcd.show_missing(missing_names)
+
                 if (len(self.missing_items) == 0):
                     self.transition(State.ITEMS_ACCOUNTED_FOR)
                     print("No items missing, moving to ITEMS_ACCOUNTED_FOR state.")
@@ -197,6 +205,7 @@ class StateManager():
                 self.led.breathe_slow(GREEN)
                 self.missing_items = self.scan()
                 if (len(self.missing_items) == 0):
+                    self.lcd.show_all_items_clear(len(self.profile))
                     self.transition(State.ITEMS_ACCOUNTED_FOR)
                 else:
                     self.transition(State.ITEMS_MISSING)
@@ -219,7 +228,7 @@ def main():
     manager = StateManager()
     try:
         manager.run()
-    except KeyboardInterrupt:
+    finally:
         manager.close()
 
 if __name__ == "__main__":
