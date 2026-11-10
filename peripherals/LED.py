@@ -40,21 +40,6 @@ GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 OFF = (0, 0, 0)
 
-class LED_strip():
-
-    def __init__(self, pin=board.D18, num_leds=NUM_LEDS, brightness=MAX_BRIGHTNESS):
-        self._pixels = neopixel.NeoPixel(
-            pin, num_leds,
-            brightness=min(brightness, MAX_BRIGHTNESS),
-            auto_write=False,
-            pixel_order=neopixel.GRB,  # WS2812B; if red shows as green, try RGB
-        )
-        self._stop = threading.Event()
-        self._thread = None
-        self._current = OFF       # what the strip is showing right now
-        self._show(OFF)           # start dark immediately, no fade
-        self._mode = ("off",)
-
 
 def _scale(color, level):
     return tuple(round(c * level) for c in color)
@@ -162,7 +147,7 @@ class LED_strip():
 
 
 if __name__ == "__main__":
-    strip = LEDStrip()
+    strip = LED_Strip()
     try:
         print("Fast breathing, red, for 4 s")
         strip.breathe_fast(RED)
