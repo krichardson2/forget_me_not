@@ -238,7 +238,7 @@ class StateManager():
                 if self.timer.expired:
                     print("Timer expired, moving to IDLE state.")
                     self.transition(State.IDLE)
-                if self.button.get_event() == "LONG":
+                if self.button.get_event() == "SHORT":
                     print("Button Long pressed, moving to IDLE state.")
                     self.transition(State.IDLE)
                 continue
@@ -260,7 +260,7 @@ class StateManager():
                 if self.timer.expired:
                     print("Timer expired, moving to IDLE state.")
                     self.transition(State.IDLE)
-                if self.button.get_event() == "LONG":
+                if self.button.get_event() == "SHORT":
                     print("Button Long pressed, moving to IDLE state.")
                     self.transition(State.IDLE)
                 continue
