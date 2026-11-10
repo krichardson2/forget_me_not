@@ -14,9 +14,9 @@ from peripherals.uhf_reader import UHFReader
 from peripherals.LED        import LED_strip, RED, GREEN, BLUE, WHITE, OFF
 from peripherals.TIMER      import Timer
 from peripherals.PRESENCE   import PresenceTracker
+from peripherals.BUTTON     import Push_Button
 # from peripherals.lcd_screen  import LCD_screen
 # from peripherals.clock       import Clock
-# from peripherals.push_button import PushButton
 
 class State(Enum):
     CONFIGURATION       = 1
@@ -32,23 +32,23 @@ class Trigger(Enum):
 class StateManager():
     def __init__(self):
         #initial state for testing
-        self._state = State.TRIGGERED 
+        self._state = State.IDLE 
         self._tags_seen = None
         self._freshScan = True
-        self._triggers = (False, False) # Alarm, Button
+        self._triggers = (False, True) # Alarm, Button
         self._trigger_deadline = None 
 
         #define manager's peripherals
         self.reader = UHFReader('/dev/RFID_scanner')
         self.reader.set_region(0x02) # US region
-        self.reader.set_tx_power(18)
+        self.reader.set_tx_power(20)
         self.reader.set_session(0, q=4)
         self.led = LED_strip()
         self.led.off()
         self.timer = Timer()
         #self.screen = LCD_screen()
         #self.clock = Clock()
-        #self.button = PushButton()
+        self.button = Push_Button()
 
         # Read in items list
         self.items_list = read_items(path="items.json")
@@ -88,40 +88,8 @@ class StateManager():
         """
         Scan for items and check against expected list.
         """
-        self._presence.update(self.reader.inventory(rounds=20, duration=0.5))
+        self._presence.update(self.reader.inventory(rounds=50, duration=1.0))
         return self._presence.missing()
-
-        """
-        # at the start of a new scan, start with a fresh set of tags seen
-        if self._freshScan:
-            self._tags_seen = set()
-            self._freshScan = False
-        tags_expected = set(self.profile)
-        tags_current_read = self.reader.inventory(rounds=50, duration=0.5)
-
-        print(f"Expected:\t{tags_expected}")
-        print(f"Seen:\t{tags_current_read}")
-
-        self._tags_seen |= tags_current_read
-
-        tags_missing = tags_expected - self._tags_seen
-
-        # Let's do some better logic here. Should not just be binary each scan,
-        # but rather, keep track of last seen time.
-
-
-        if len(tags_missing) > 0:
-            print(f"Items Missing: {tags_missing}")
-            missing_names = sorted(self.profile[tag] for tag in tags_missing)
-            print(f"Missing Names: {missing_names}")
-            self.transition(State.ITEMS_MISSING)
-        elif len(tags_missing) == 0:
-            print("All items accounted for.\n")
-            # Reload state variable for new check
-            self._freshScan = True
-            self.transition(State.ITEMS_ACCOUNTED_FOR)
-        return
-        """
 
     def check_triggers(self):
         # from trigger, start 20 minute timer for mode
@@ -133,7 +101,7 @@ class StateManager():
                     alarm.minute == now.tm_min and
                     alarm.second == now.tm_sec):
                     return True, False
-        if self.button.short_pressed:
+        if self.button.get_event() == "SHORT":
             return False, True
         return False, False
 
@@ -150,6 +118,9 @@ class StateManager():
         # self.LCD_screen.close() # Close I2C bus 
 
     def run(self):
+        """
+        Super loop of the application
+        """
         while True:
             time.sleep(0.2)
 
@@ -157,10 +128,10 @@ class StateManager():
                 """
                 check for triggers
                 """
-
+                self.led.off()
                 self._triggers = self.check_triggers()
-
-
+                if any(self._triggers):
+                    self.transition(State.TRIGGERED)
                 continue
             elif (self.state == State.TRIGGERED):
                 """
@@ -170,9 +141,13 @@ class StateManager():
                 # if triggered by alarm, start 20 minute timer
                 if self._trigger_deadline is None:
                     if self._triggers[0]:
+                        self._triggers = (False, False)
+                        print("Triggered by Alarm, starting 20 minute timer.")
                         self.timer.start(20*60)
                     # else if triggered by button, start 5 minute timer
                     elif self._triggers[1]:
+                        self._triggers = (False, False)
+                        print("Triggered by Button, starting 5 minute timer.")
                         self.timer.start(5*60)
                     self._trigger_deadline = time.monotonic() + 3.0
 
@@ -205,7 +180,11 @@ class StateManager():
                     self.transition(State.ITEMS_ACCOUNTED_FOR)
                     print("No items missing, moving to ITEMS_ACCOUNTED_FOR state.")
                 # exit this state if time's up or button pressed
-                if self.timer.expired: # or self.button.pressed:
+                if self.timer.expired: 
+                    print("Timer expired, moving to IDLE state.")
+                    self.transition(State.IDLE)
+                if self.button.get_event() == "LONG":
+                    print("Button Long pressed, moving to IDLE state.")
                     self.transition(State.IDLE)
                 continue
             elif (self.state == State.ITEMS_ACCOUNTED_FOR):
@@ -222,7 +201,11 @@ class StateManager():
                 else:
                     self.transition(State.ITEMS_MISSING)
                 # exit this state if time's up or button pressed
-                if self.timer.expired: # or self.button.pressed:
+                if self.timer.expired: 
+                    print("Timer expired, moving to IDLE state.")
+                    self.transition(State.IDLE)
+                if self.button.get_event() == "LONG":
+                    print("Button Long pressed, moving to IDLE state.")
                     self.transition(State.IDLE)
                 continue
 
