@@ -1,0 +1,26 @@
+[Unit]
+Description=RFID Item Checker
+After=local-fs.target
+# Never give up restarting, even after many failures in a row
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Root is required by the LED strip library (rpi_ws281x)
+User=root
+WorkingDirectory=/home/pi/rfid-item-check
+ExecStart=/home/pi/venv/bin/python /home/pi/rfid-item-check/State.py
+# Send print() output to the journal immediately instead of buffering it
+Environment=PYTHONUNBUFFERED=1
+
+# Restart whenever the program stops, for any reason, after a short pause
+Restart=always
+RestartSec=3
+
+# On stop, State.py gets SIGTERM and runs close() (LED fade, reader, button, screen).
+# Give it time to finish before systemd forces it.
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
