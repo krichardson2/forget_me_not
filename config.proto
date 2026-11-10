@@ -5,7 +5,7 @@ package rfidcheck;
 // One tracked item: an RFID tag mapped to a display name.
 message Item {
   string tag = 1;   // EPC as uppercase hex, e.g. "E28011B0A506007F786F06B1"
-  string name = 2;  // 1-20 printable ASCII characters (fits one LCD row)
+  string name = 2;  // 1+ printable ASCII characters (long names scroll on the LCD)
 }
 
 message ItemList {

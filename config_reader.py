@@ -9,7 +9,6 @@ import config_pb2
 
 MAX_ITEMS = 50
 MAX_ALARMS = 10
-MAX_NAME_LEN = 20
 TAG_PATTERN = re.compile(r"^[0-9A-F]{24}$")  # 96-bit EPC, uppercase hex
 
 
@@ -29,8 +28,8 @@ def validate_items(item_list):
         elif item.tag in seen:
             errors.append(f"item {i}: duplicate tag {item.tag}")
         seen.add(item.tag)
-        if not 1 <= len(item.name) <= MAX_NAME_LEN:
-            errors.append(f"item {i}: name '{item.name}' must be 1-{MAX_NAME_LEN} characters")
+        if not item.name:
+            errors.append(f"item {i}: name must not be empty")
         elif not all(32 <= ord(c) < 127 for c in item.name):
             errors.append(f"item {i}: name '{item.name}' must use plain ASCII characters")
     return errors

@@ -8,8 +8,8 @@ except ImportError:
 I2C_ADDRESS = 0x27
 COLS, ROWS = 20, 4
 PAGE_SECONDS = 3.0   # minimum time each page of missing items stays up
-SCROLL_STEP = 0.4    # seconds per one-character scroll (below ~0.3 s gets hard to read)
-SCROLL_PAUSE = 4     # steps to hold the start of a long name before it scrolls
+SCROLL_STEP = 0.3    # seconds per one-character scroll (below ~0.3 s gets hard to read)
+SCROLL_PAUSE = 5     # steps to hold the start of a long name before it scrolls (~1.5 s)
 SCROLL_GAP = "   "   # spacing between the end of a name and its start coming around
 
 
