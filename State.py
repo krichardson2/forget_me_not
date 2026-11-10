@@ -62,7 +62,7 @@ class StateManager():
             for ind,item in enumerate(self.items_list.items):
                 print(f"\t{ind} : {item.name}\t|\t{item.tag}")
         
-        self._presence = PresenceTracker(self.profile, window=5.0)
+        self._presence = PresenceTracker(self.profile, window=2.0)
 
         # Read in alarms
         alarms = read_alarms(path="alarms.json")
@@ -158,7 +158,8 @@ class StateManager():
                     self._trigger_deadline = time.monotonic() + 3.0
 
                 self.missing_items = self.scan()
-                print(f"Missing: {self.missing_items}")
+                if not self.missing_items:
+                    print(f"Missing: {self.missing_items}")
                 
                 if len(self.missing_items) == 0:
                     self._trigger_deadline = None
