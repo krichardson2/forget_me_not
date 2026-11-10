@@ -14,8 +14,16 @@ SCROLL_GAP = "   "   # spacing between the end of a name and its start coming ar
 
 
 # custom characters..
+SMILEY = (0b00000, 0b01010, 0b01010, 0b00000, 0b10001, 0b01110, 0b00000, 0b00000)
+CHECK  = (0b00000, 0b00001, 0b00011, 0b10110, 0b11100, 0b01000, 0b00000, 0b00000)
 raised_eyebrow = (0b01000,0b10011,0b00000,0b01010,0b00000,0b10001,0b01110,0b00000)
 regular_eyebrow = (0b00000,0b11011,0b00000,0b01010,0b00000,0b10001,0b01110,0b00000)
+
+
+
+ICON_SMILEY, ICON_CHECK = "\x00", "\x01"     # characters that display slots 0 and 1
+ICON_RAISED, ICON_REGULAR = "\x02", "\x03"
+TERMINAL_ICONS = str.maketrans({ICON_SMILEY: "☺", ICON_CHECK: "✓"})
 
 
 def center(text):
@@ -56,6 +64,10 @@ class LCD_screen:
                                    auto_linebreaks=False,
                                    backlight_enabled=True)
                 self.lcd.clear()
+                self.lcd.create_char(0, SMILEY)
+                self.lcd.create_char(1, CHECK)
+                self.lcd.create_char(2, raised_eyebrow)
+                self.lcd.create_char(3, regular_eyebrow)
             except OSError as e:
                 print(f"LCD not found at {hex(address)} ({e}); printing to terminal")
                 self.lcd = None
@@ -138,8 +150,9 @@ class LCD_screen:
         self._page = 0
         self._page_start = time.monotonic()
 
-    def show_all_items_clear(self, items_count):
-        self.show(["", center("ALL ITEMS PRESENT"), center(f"{items_count} of {items_count} found")])
+    def show_all_items_clear(self, items_count, icon=ICON_CHECK):
+        self.show(["", center(f"{icon} ALL ITEMS PRESENT"),
+                   center(f"{items_count} of {items_count} found")])
 
     def close(self):
         if self.lcd is not None:
