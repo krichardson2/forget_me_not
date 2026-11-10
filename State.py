@@ -1,6 +1,7 @@
 # RFID State manager
 
 import time
+import signal
 
 from enum           import Enum
 from collections    import deque
@@ -113,8 +114,8 @@ class StateManager():
     def close(self):
         self.reader.close() # close serial connection to 
         self.timer.cancel() # cancel any running timers
-        self.led.off()      # turn off LED strip
         self.lcd.close()
+        self.led.close()      # turn off LED strip
 
         # self.LCD_screen.close() # Close I2C bus 
 
@@ -224,11 +225,17 @@ class StateManager():
                 """
                 continue
 
+def _stop(signum, frame):
+    raise KeyboardInterrupt   
+
 def main():
     manager = StateManager()
     try:
         manager.run()
+    except KeyboardInterrupt:
+        print("\nClosing manager.\n")
     finally:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)   # a second Ctrl+C can't interrupt cleanup
         manager.close()
 
 if __name__ == "__main__":
