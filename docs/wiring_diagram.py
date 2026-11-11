@@ -6,7 +6,7 @@ The Pi 3B+ has the same 40-pin header as the Pi 4, so the Pi 4 board layout is u
 """
 from pathlib import Path
 
-from pinviz import (boards, devices, Component, ComponentType, Connection,
+from pinviz import (boards, devices, Connection,
                     Device, DevicePin, Diagram, PinRole, Point, SVGRenderer)
 
 registry = devices.get_registry()
@@ -50,8 +50,7 @@ rfid = Device(
 connections = [
     # LED strip
     Connection(2, "WS2812B Strip", "5V"),
-    Connection(12, "WS2812B Strip", "DIN",
-               components=[Component(ComponentType.RESISTOR, "330Ω")]),   # GPIO18
+    Connection(12, "WS2812B Strip", "DIN"),   # GPIO18
     Connection(6, "WS2812B Strip", "GND"),
 
     # LCD (I2C)
