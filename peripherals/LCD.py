@@ -13,17 +13,32 @@ SCROLL_PAUSE = 5     # steps to hold the start of a long name before it scrolls 
 SCROLL_GAP = "   "   # spacing between the end of a name and its start coming around
 
 
-# custom characters..
-SMILEY = (0b00000, 0b01010, 0b01010, 0b00000, 0b10001, 0b01110, 0b00000, 0b00000)
-CHECK  = (0b00000, 0b00001, 0b00011, 0b10110, 0b11100, 0b01000, 0b00000, 0b00000)
-raised_eyebrow = (0b01000,0b10011,0b00000,0b01010,0b00000,0b10001,0b01110,0b00000)
-regular_eyebrow = (0b00000,0b11011,0b00000,0b01010,0b00000,0b10001,0b01110,0b00000)
+# ---- custom icons ----------------------------------------------------------------
+# Each icon is 8 rows of 5 pixels (1 = lit). Leave the bottom row blank; the cursor
+# underline uses it. The LCD holds at most 8 custom characters, so at most 8 icons.
+# To add one: add its bitmap here, add a stand-in for the terminal preview to
+# TERMINAL_PREVIEW, then use its name (e.g. ALL_CLEAR_ICON in settings.py).
+ICONS = {
+    "smiley":          (0b00000, 0b01010, 0b01010, 0b00000, 0b10001, 0b01110, 0b00000, 0b00000),
+    "check":           (0b00000, 0b00001, 0b00011, 0b10110, 0b11100, 0b01000, 0b00000, 0b00000),
+    "raised_eyebrow":  (0b01000, 0b10011, 0b00000, 0b01010, 0b00000, 0b10001, 0b01110, 0b00000),
+    "regular_eyebrow": (0b00000, 0b11011, 0b00000, 0b01010, 0b00000, 0b10001, 0b01110, 0b00000),
+}
+# What each icon prints as when there's no LCD (e.g. testing on a laptop)
+TERMINAL_PREVIEW = {"smiley": "☺", "check": "✓", "raised_eyebrow": "ಠ", "regular_eyebrow": "☺"}
+
+if len(ICONS) > 8:
+    raise ValueError(f"The LCD holds 8 custom characters; ICONS has {len(ICONS)}")
+
+# Icon i is stored in LCD slot i and displayed by writing the character chr(i)
+_SLOTS = {name: chr(slot) for slot, name in enumerate(ICONS)}
+_TERMINAL = str.maketrans({_SLOTS[n]: TERMINAL_PREVIEW.get(n, "?") for n in ICONS})
 
 
-
-ICON_SMILEY, ICON_CHECK = "\x00", "\x01"     # characters that display slots 0 and 1
-ICON_RAISED, ICON_REGULAR = "\x02", "\x03"
-TERMINAL_ICONS = str.maketrans({ICON_SMILEY: "☺", ICON_CHECK: "✓"})
+def icon(name):
+    """The character that shows icon `name` on the LCD. Unknown names fall back to "check"
+    (State.py warns about a bad name once at startup, so this stays quiet)."""
+    return _SLOTS.get(name, _SLOTS["check"])
 
 
 def center(text):
@@ -64,10 +79,8 @@ class LCD_screen:
                                    auto_linebreaks=False,
                                    backlight_enabled=True)
                 self.lcd.clear()
-                self.lcd.create_char(0, SMILEY)
-                self.lcd.create_char(1, CHECK)
-                self.lcd.create_char(2, raised_eyebrow)
-                self.lcd.create_char(3, regular_eyebrow)
+                for slot, bitmap in enumerate(ICONS.values()):
+                    self.lcd.create_char(slot, bitmap)
             except OSError as e:
                 print(f"LCD not found at {hex(address)} ({e}); printing to terminal")
                 self.lcd = None
@@ -81,7 +94,7 @@ class LCD_screen:
             return
         self._shown[row] = text
         if self.lcd is None:
-            print(f"[LCD row {row}] |{text}|")
+            print(f"[LCD row {row}] |{text.translate(_TERMINAL)}|")
             return
         self.lcd.cursor_pos = (row, 0)
         self.lcd.write_string(text)
@@ -150,8 +163,8 @@ class LCD_screen:
         self._page = 0
         self._page_start = time.monotonic()
 
-    def show_all_items_clear(self, items_count, icon=ICON_CHECK):
-        self.show(["", center(f"{icon} ALL ITEMS PRESENT"),
+    def show_all_items_clear(self, items_count, icon_name="check"):
+        self.show(["", center(f"{icon(icon_name)} ALL ITEMS PRESENT"),
                    center(f"{items_count} of {items_count} found")])
 
     def close(self):

@@ -11,6 +11,7 @@ import select
 import subprocess
 import sys
 import termios
+import time
 import tty
 from pathlib import Path
 
@@ -19,10 +20,10 @@ sys.path.insert(0, str(REPO_DIR))      # so the configuration and peripherals pa
 
 from configuration.config_reader import MAX_ALARMS, MAX_ITEMS, TAG_PATTERN
 from configuration.config_writer import write_alarms, write_items
+from settings import CONFIGURE_TX_POWER_DBM as TX_POWER_DBM   # edit in settings.py
 
 CONFIG_DIR = REPO_DIR                  # items.json and alarms.json live next to State.py
 READER_DEV = "/dev/RFID_scanner"
-TX_POWER_DBM = 20          # same power the app scans at
 SERVICE = "rfid-checker"
 
 DIM, RESET, CLEAR_LINE = "\033[2m", "\033[0m", "\r\033[K"
@@ -140,25 +141,50 @@ def _enter_pressed():
     return False
 
 
-def wait_for_single_tag(reader, named):
+def setup_reader(reader):
+    """Send the same reader settings State.py uses. Returns (hardware version or None, warnings)."""
+    from peripherals.uhf_reader import REGION_US
+    version = reader.hardware_version()
+    if version is None:
+        return None, []
+    checks = ((reader.set_region(REGION_US), "US region"),
+              (reader.set_tx_power(TX_POWER_DBM), f"power {TX_POWER_DBM} dBm"),
+              (reader.set_session(0, q=4), "session 0, Q=4"))
+    return version, [f"the reader didn't confirm {label}" for ok, label in checks if not ok]
+
+
+RECHECK_EVERY = 20     # empty scans in a row before checking the reader is still answering
+
+
+def wait_for_single_tag(reader, named, setup=None):
     """Scan until exactly one new tag is in range. Returns its EPC, or None if Enter is pressed.
 
     `named` maps tags already named this session to their names. A tag is accepted only
     after two scans in a row see it and nothing else, so a second tag that reads only
-    now and then isn't missed.
+    now and then isn't missed. After RECHECK_EVERY empty scans in a row, `setup(reader)`
+    runs again, in case the reader reset or stopped answering.
     """
-    history, status, scans = [], None, 0
+    history, status, scans, empty = [], None, 0, 0
     while True:
         if _enter_pressed():
             if status:
                 print()
             return None
         history = (history + [reader.inventory(rounds=50, duration=0.25)])[-3:]   # same as State.py
+        time.sleep(0.05)       # same gap as State.py's loop, so the reader finishes stopping
         scans += 1
         seen = set().union(*history)
+        empty = 0 if history[-1] else empty + 1
 
         if not seen:
             msg = f"Waiting for a tag... (scan {scans})"   # the count shows it's still scanning
+            if setup and empty >= RECHECK_EVERY:
+                empty = 0
+                version, warnings = setup(reader)
+                if version is None:
+                    msg = f"The reader isn't answering - unplug it and plug it back in (scan {scans})"
+                elif warnings:
+                    msg = f"Reader warning: {warnings[0]} (scan {scans})"
         elif len(seen) > 1:
             msg = f"{len(seen)} tags in range - move all but one away"
         else:
@@ -200,28 +226,25 @@ def configure_items():
         print(f"  sudo systemctl stop {SERVICE}")
         return
 
-    from peripherals.uhf_reader import UHFReader, REGION_US   # needs pyserial; only for items
+    from peripherals.uhf_reader import UHFReader   # needs pyserial; only for items
     reader = UHFReader(READER_DEV)
     items = []
     try:
-        version = reader.hardware_version()
+        version, warnings = setup_reader(reader)
         if version is None:
             print(f"\nThe reader at {READER_DEV} isn't answering. Unplug it, plug it back in and try again.")
             return
-        # Same setup as State.py, so tags read here exactly as they do in the app
-        ok_region = reader.set_region(REGION_US)
-        ok_power = reader.set_tx_power(TX_POWER_DBM)
-        ok_session = reader.set_session(0, q=4)
         print(f"\nReader on {READER_DEV}: {version.strip() or 'connected'}")
-        for label, ok in (("US region", ok_region), (f"power {TX_POWER_DBM} dBm", ok_power),
-                          ("session 0, Q=4", ok_session)):
-            if not ok:
-                print(f"  Warning: the reader didn't confirm {label}.")
+        for w in warnings:
+            print(f"  Warning: {w}.")
 
         print(f"\nItems: up to {MAX_ITEMS}. Press Enter at any time while scanning to finish.")
         while len(items) < MAX_ITEMS:
             print(f"\nItem #{len(items) + 1}: bring a single tag near the reader.")
-            tag = wait_for_single_tag(reader, dict(items))
+            # The reader sat idle while the name was typed; send its settings again first
+            for w in setup_reader(reader)[1]:
+                print(f"  Warning: {w}.")
+            tag = wait_for_single_tag(reader, dict(items), setup=setup_reader)
             if tag is None:
                 break
             print(f"  Tag: {tag}")

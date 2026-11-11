@@ -16,7 +16,8 @@ from peripherals.LED        import LED_strip, RED, GREEN, BLUE, WHITE, OFF
 from peripherals.TIMER      import Timer
 from peripherals.PRESENCE   import PresenceTracker
 from peripherals.BUTTON     import Push_Button
-from peripherals.LCD  import LCD_screen, center
+from peripherals.LCD  import LCD_screen, center, ICONS
+import settings
 # from peripherals.clock       import Clock
 
 class State(Enum):
@@ -53,12 +54,15 @@ class StateManager():
         #define manager's peripherals
         self.reader = UHFReader('/dev/RFID_scanner')
         self.reader.set_region(0x02) # US region
-        self.reader.set_tx_power(20)
+        self.reader.set_tx_power(settings.READER_TX_POWER_DBM)
         self.reader.set_session(0, q=4)
         self.led = LED_strip()
         self.led.off()
         self.timer = Timer()
         self.lcd = LCD_screen()
+        if settings.ALL_CLEAR_ICON not in ICONS:
+            print(f"settings.ALL_CLEAR_ICON {settings.ALL_CLEAR_ICON!r} isn't in ICONS "
+                  f"({', '.join(ICONS)}); showing 'check' instead.")
         #self.clock = Clock()
         self.button = Push_Button()
 
@@ -74,7 +78,8 @@ class StateManager():
             for ind,item in enumerate(self.items_list.items):
                 print(f"\t{ind} : {item.name}\t|\t{item.tag}")
 
-        self._presence = PresenceTracker(self.profile, window=3.0)
+        self._presence = PresenceTracker(self.profile, window=settings.PRESENCE_WINDOW_SECONDS)
+        self._logged_missing = None   # last missing set printed, so the journal only gets changes
 
         # Read in alarms
         alarms = read_alarms(path="alarms.json")
@@ -104,6 +109,8 @@ class StateManager():
         # if state valid, set it
         if state in State:
             self._state = state
+            if state == State.IDLE:
+                self._logged_missing = None   # log the full list again on the next check
         else:
             print(f"Invalid state transition attempted: {state}")
 
@@ -113,7 +120,13 @@ class StateManager():
         Scan for items and check against expected list.
         """
         self._presence.update(self.reader.inventory(rounds=50, duration=0.25))
-        return self._presence.missing()
+        missing = self._presence.missing()
+        # Log only when the missing set changes; every scan (~3 a second) would flood journald
+        if missing != self._logged_missing:
+            names = sorted(self.profile[tag] for tag in missing)
+            print(f"Missing: {', '.join(names)}" if names else "Missing: none")
+            self._logged_missing = missing
+        return missing
 
     def check_alarm(self):
         """
@@ -204,8 +217,6 @@ class StateManager():
                     self._trigger_deadline = time.monotonic() + 3.0
 
                 self.missing_items = self.scan()
-                if self.missing_items:
-                    print(f"Missing: {self.missing_items}")
 
                 if len(self.missing_items) == 0:
                     self._trigger_deadline = None
@@ -253,7 +264,7 @@ class StateManager():
                 self.led.breathe_slow(GREEN)
                 self.missing_items = self.scan()
                 if (len(self.missing_items) == 0):
-                    self.lcd.show_all_items_clear(len(self.profile))
+                    self.lcd.show_all_items_clear(len(self.profile), settings.ALL_CLEAR_ICON)
                     self.transition(State.ITEMS_ACCOUNTED_FOR)
                 else:
                     self.transition(State.ITEMS_MISSING)
