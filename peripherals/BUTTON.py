@@ -5,7 +5,7 @@ import queue
 from gpiozero import Button
 
 SHORT_MAX = 2.0
-SHORT_MIN = 0.15
+SHORT_MIN = 0.05   # quick taps count; bounce_time already filters contact noise
 
 class Push_Button:
     def __init__(self, pin=23, bounce_time=0.05):

@@ -16,7 +16,7 @@ from peripherals.LED        import LED_strip, RED, GREEN, BLUE, WHITE, OFF
 from peripherals.TIMER      import Timer
 from peripherals.PRESENCE   import PresenceTracker
 from peripherals.BUTTON     import Push_Button
-from peripherals.LCD  import LCD_screen
+from peripherals.LCD  import LCD_screen, center
 # from peripherals.clock       import Clock
 
 class State(Enum):
@@ -112,7 +112,7 @@ class StateManager():
         """
         Scan for items and check against expected list.
         """
-        self._presence.update(self.reader.inventory(rounds=50, duration=1.0))
+        self._presence.update(self.reader.inventory(rounds=50, duration=0.25))
         return self._presence.missing()
 
     def check_alarm(self):
@@ -163,7 +163,7 @@ class StateManager():
         Super loop of the application
         """
         while True:
-            time.sleep(0.2)
+            time.sleep(0.05)
 
             # Check every pass so the deque keeps rotating and an alarm that passes
             # outside Idle doesn't fire late when the device returns to Idle.
@@ -190,6 +190,7 @@ class StateManager():
                 # First pass of a new check: set it up once
                 if self._trigger_deadline is None:
                     self._presence.reset()
+                    self.lcd.show([center("Scanning...")])
                     # if triggered by alarm, start 20 minute timer
                     if self._triggers[0]:
                         self._triggers = (False, False)
