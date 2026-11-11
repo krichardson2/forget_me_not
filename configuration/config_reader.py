@@ -5,7 +5,7 @@ import sys
 
 from google.protobuf import json_format
 
-import config_pb2
+from . import config_pb2
 
 MAX_ITEMS = 50
 MAX_ALARMS = 10

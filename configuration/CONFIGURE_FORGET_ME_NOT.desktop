@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Configure Forget Me Not
+Comment=Set up alarms and scan item tags
+Exec=lxterminal --title="Forget Me Not setup" -e /home/pi/rfid-item-check/configuration/configure.sh
+Icon=preferences-system
+Terminal=true
+X-KeepTerminal=false

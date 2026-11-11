@@ -9,8 +9,8 @@ from pathlib        import Path
 
 
 from peripherals            import *
-from config_reader          import read_items, read_alarms
-from config_writer          import write_items, write_alarms
+from configuration.config_reader import read_items, read_alarms
+from configuration.config_writer import write_items, write_alarms
 from peripherals.uhf_reader import UHFReader
 from peripherals.LED        import LED_strip, RED, GREEN, BLUE, WHITE, OFF
 from peripherals.TIMER      import Timer
