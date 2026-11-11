@@ -5,8 +5,8 @@ import tempfile
 
 from google.protobuf import json_format
 
-import config_pb2
-from config_reader import validate_alarms, validate_items
+from . import config_pb2
+from .config_reader import validate_alarms, validate_items
 
 
 def _error(msg):
