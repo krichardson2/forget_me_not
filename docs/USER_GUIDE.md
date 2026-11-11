@@ -20,7 +20,6 @@ A check starts at a scheduled alarm time or when someone presses the button. The
 | DS3231 real-time clock module | Coin cell backup, I2C address 0x68 |
 | Momentary pushbutton | Starts or cancels a check |
 | UHF RFID tags (10) | Assigned to the preset item profile |
-| 330 Ω resistor | In series with the LED strip's data line |
 
 ### Safety and handling
 
@@ -40,7 +39,7 @@ Disconnect power before wiring. Pin numbers are physical header pins; pin 1 has 
 | Device | Device pin | Pi pin | Pi function |
 | --- | --- | --- | --- |
 | LED strip | 5V (red wire) | 2 | 5 V power |
-| LED strip | DIN (green wire), through the 330 Ω resistor | 12 | GPIO18 (PWM) |
+| LED strip | DIN (green wire) | 12 | GPIO18 (PWM) |
 | LED strip | GND (white wire) | 6 | Ground |
 | LCD 20x4 | VCC | 1 | 3.3 V power |
 | LCD 20x4 | GND | 9 | Ground |

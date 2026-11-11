@@ -6,7 +6,7 @@ LED strip driver: WS2812B, 40 LEDs, Raspberry Pi 3B+.
 Development wiring (strip powered from the Pi):
     strip red   -> Pi 5V   (physical pin 2)
     strip white -> Pi GND  (physical pin 6)
-    strip green -> 330 ohm resistor -> GPIO18 (physical pin 12)
+    strip green -> GPIO18 (physical pin 12)
 
 Setup:
     pip install adafruit-circuitpython-neopixel
